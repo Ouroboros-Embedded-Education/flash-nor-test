@@ -21,7 +21,10 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdio.h>
+
 #include "nor.h"
+#include "lcdDisplay.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -48,6 +51,7 @@ UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
 nor_t Nor;
+lcd_t Lcd;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -62,11 +66,7 @@ static void MX_TIM2_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-//typedef void (*SpiTx_fxn_t)(uint8_t* TxBuff, uint32_t len);
-//typedef void (*SpiRx_fxn_t)(uint8_t* RxBuff, uint32_t len);
-//typedef void (*CS_Assert_fnx_t)(void);
-//typedef void (*CS_Deassert_fxn_t)(void);
-//typedef void (*delay_us_fxn_t)(uint32_t us);
+/* NOR Functions */
 
 void _nor_cs_assert(){
 	HAL_GPIO_WritePin(W25_CS_GPIO_Port, W25_CS_Pin, GPIO_PIN_RESET);
@@ -94,7 +94,7 @@ void _nor_delay_us(uint32_t us){
 	HAL_TIM_Base_Stop(&htim2);
 }
 
-void __init_nor(){
+void __nor_init(){
 	nor_err_e err;
 
 	Nor.config.CsAssert = _nor_cs_assert;
@@ -129,6 +129,30 @@ void __set_couter_Val(uint32_t val){
 	NOR_WriteBytes(&Nor, (uint8_t*)&val, addr, sizeof(val));
 }
 
+/* LCD Functions */
+
+void __lcd_init(){
+	Lcd.columns = 16;
+	Lcd.rows = 2;
+	Lcd.font = LCD_FONT_5X8;
+	Lcd.interface = LCD_INTERFACE_4BIT;
+
+	Lcd.gpios[LCD_RS].GPIO = (uint32_t)LCD_RS_GPIO_Port;
+	Lcd.gpios[LCD_RS].pin = LCD_RS_Pin;
+	Lcd.gpios[LCD_E].GPIO = (uint32_t)LCD_E_GPIO_Port;
+	Lcd.gpios[LCD_E].pin = LCD_E_Pin;
+	Lcd.gpios[LCD_D4].GPIO = (uint32_t)LCD_D4_GPIO_Port;
+	Lcd.gpios[LCD_D4].pin = LCD_D4_Pin;
+	Lcd.gpios[LCD_D5].GPIO = (uint32_t)LCD_D5_GPIO_Port;
+	Lcd.gpios[LCD_D5].pin = LCD_D5_Pin;
+	Lcd.gpios[LCD_D6].GPIO = (uint32_t)LCD_D6_GPIO_Port;
+	Lcd.gpios[LCD_D6].pin = LCD_D6_Pin;
+	Lcd.gpios[LCD_D7].GPIO = (uint32_t)LCD_D7_GPIO_Port;
+	Lcd.gpios[LCD_D7].pin = LCD_D7_Pin;
+
+	lcd_init(&Lcd);
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -138,7 +162,9 @@ void __set_couter_Val(uint32_t val){
 int main(void)
 {
   /* USER CODE BEGIN 1 */
+	uint32_t halTick;
 	uint32_t Counter = 0;
+	char Tex[17];
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -163,15 +189,25 @@ int main(void)
   MX_USART1_UART_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-  __init_nor();
-
+  __nor_init();
   __get_counter_Val(&Counter);
+
+  __lcd_init();
+  lcd_send_string_pos(&Lcd, "Mem Flash NOR", 0, 0);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  halTick = HAL_GetTick();
+
+	  sprintf(Tex, "C: 0x%08X", Counter);
+	  lcd_send_string_pos(&Lcd, Tex, 1, 0);
+	  __set_couter_Val(Counter);
+
+	  while ((HAL_GetTick() - halTick) < 1000);
+	  Counter++;
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -354,9 +390,14 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(W25_CS_GPIO_Port, W25_CS_Pin, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, LCD_RS_Pin|LCD_E_Pin|LCD_D4_Pin|LCD_D5_Pin
+                          |LCD_D6_Pin|LCD_D7_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : W25_CS_Pin */
   GPIO_InitStruct.Pin = W25_CS_Pin;
@@ -364,6 +405,15 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
   HAL_GPIO_Init(W25_CS_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : LCD_RS_Pin LCD_E_Pin LCD_D4_Pin LCD_D5_Pin
+                           LCD_D6_Pin LCD_D7_Pin */
+  GPIO_InitStruct.Pin = LCD_RS_Pin|LCD_E_Pin|LCD_D4_Pin|LCD_D5_Pin
+                          |LCD_D6_Pin|LCD_D7_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
