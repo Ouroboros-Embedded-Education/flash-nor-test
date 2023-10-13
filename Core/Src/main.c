@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "nor.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -42,10 +42,12 @@
 /* Private variables ---------------------------------------------------------*/
 SPI_HandleTypeDef hspi1;
 
+TIM_HandleTypeDef htim2;
+
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-
+nor_t Nor;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -53,12 +55,97 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+//typedef void (*SpiTx_fxn_t)(uint8_t* TxBuff, uint32_t len);
+//typedef void (*SpiRx_fxn_t)(uint8_t* RxBuff, uint32_t len);
+//typedef void (*CS_Assert_fnx_t)(void);
+//typedef void (*CS_Deassert_fxn_t)(void);
+//typedef void (*delay_us_fxn_t)(uint32_t us);
+
+void _nor_cs_assert(){
+	HAL_GPIO_WritePin(W25_CS_GPIO_Port, W25_CS_Pin, GPIO_PIN_RESET);
+}
+
+void _nor_cs_deassert(){
+	HAL_GPIO_WritePin(W25_CS_GPIO_Port, W25_CS_Pin, GPIO_PIN_SET);
+}
+
+void _nor_rx_fxn(uint8_t* RxBuff, uint32_t len){
+	HAL_SPI_Receive(&hspi1, RxBuff, len, 100);
+}
+
+void _nor_tx_fxn(uint8_t* TxBuff, uint32_t len){
+	HAL_SPI_Transmit(&hspi1, TxBuff, len, 100);
+}
+
+void _nor_delay_us(uint32_t us){
+	if (us >= __HAL_TIM_GET_AUTORELOAD(&htim2)){
+		us = __HAL_TIM_GET_AUTORELOAD(&htim2) - 1;
+	}
+	__HAL_TIM_SET_COUNTER(&htim2, 0);
+	HAL_TIM_Base_Start(&htim2);
+	while (__HAL_TIM_GET_COUNTER(&htim2) < us);
+	HAL_TIM_Base_Stop(&htim2);
+}
+
+void __init_nor(){
+	nor_err_e err;
+
+	Nor.config.CsAssert = _nor_cs_assert;
+	Nor.config.CsDeassert = _nor_cs_deassert;
+	Nor.config.DelayUs = _nor_delay_us;
+	Nor.config.SpiRxFxn = _nor_rx_fxn;
+	Nor.config.SpiTxFxn = _nor_tx_fxn;
+
+	err = NOR_Init(&Nor);
+	if (err != NOR_OK){
+		while(1);
+	}
+}
+
+void __read_nor_reg1(){
+	uint32_t addr = 0;
+	uint8_t bff[64];
+
+	NOR_ReadBytes(&Nor, bff, addr, sizeof(bff));
+}
+
+void __read_nor_reg2(){
+	uint32_t addr = 0x2500;
+	uint8_t bff[90];
+
+	NOR_ReadBytes(&Nor, bff, addr, sizeof(bff));
+}
+
+void __write_nor_reg1(){
+	uint32_t addr = 0;
+	uint32_t Value = 2500;
+
+	if (NOR_IsEmptyPage(&Nor, 0, 0, 4) == NOR_REGIONS_IS_NOT_EMPTY){
+		NOR_EraseAddress(&Nor, 0x0, NOR_ERASE_4K);
+	}
+
+	NOR_WriteBytes(&Nor, (uint8_t*)&Value, addr, sizeof(Value));
+}
+
+void __write_nor_reg2(){
+	uint32_t addr = 0x2500;
+	uint32_t page;
+	uint32_t Value = 200;
+
+	page = addr/Nor.info.u16PageSize;
+	if (NOR_IsEmptyPage(&Nor, page, 0, 4) == NOR_REGIONS_IS_NOT_EMPTY){
+		NOR_EraseAddress(&Nor, addr, NOR_ERASE_4K);
+	}
+
+	NOR_WriteBytes(&Nor, (uint8_t*)&Value, addr, sizeof(Value));
+}
 
 /* USER CODE END 0 */
 
@@ -85,15 +172,25 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-
+  HAL_Delay(500);
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_SPI1_Init();
   MX_USART1_UART_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
+  __init_nor();
 
+  __read_nor_reg1();
+  __read_nor_reg2();
+
+  __write_nor_reg1();
+  __write_nor_reg2();
+
+  __read_nor_reg1();
+  __read_nor_reg2();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -191,6 +288,51 @@ static void MX_SPI1_Init(void)
 }
 
 /**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 99;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 4294967295;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+
+}
+
+/**
   * @brief USART1 Initialization Function
   * @param None
   * @retval None
@@ -253,7 +395,9 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-
+int __io_putchar(int ch){
+	HAL_UART_Transmit(&huart1, (uint8_t*)&ch, 1, 10);
+}
 /* USER CODE END 4 */
 
 /**
