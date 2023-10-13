@@ -1,6 +1,6 @@
 [submodule "/libs/flash-nor"]
 	path = /libs/flash-nor
-	url = git@github.com:Pablo-Jean/Nor-Flash-Driver.git
+	url = https://github.com/Pablo-Jean/Nor-Flash-Driver.git
 [submodule "/libs/lcd"]
 	path = /libs/lcd
-	url = git@github.com:Pablo-Jean/lcd-display.git
+	url = https://github.com/Pablo-Jean/lcd-display.git
