@@ -109,42 +109,24 @@ void __init_nor(){
 	}
 }
 
-void __read_nor_reg1(){
-	uint32_t addr = 0;
-	uint8_t bff[64];
+void __get_counter_Val(uint32_t *val){
+	uint32_t addr = 0x0;
+	uint32_t _temp;
 
-	NOR_ReadBytes(&Nor, bff, addr, sizeof(bff));
+	NOR_ReadBytes(&Nor, &_temp, addr, sizeof(_temp));
+	if (_temp != 0xFFFFFFFF){
+		*val = _temp;
+	}
 }
 
-void __read_nor_reg2(){
-	uint32_t addr = 0x2500;
-	uint8_t bff[90];
-
-	NOR_ReadBytes(&Nor, bff, addr, sizeof(bff));
-}
-
-void __write_nor_reg1(){
+void __set_couter_Val(uint32_t val){
 	uint32_t addr = 0;
-	uint32_t Value = 2500;
 
 	if (NOR_IsEmptyPage(&Nor, 0, 0, 4) == NOR_REGIONS_IS_NOT_EMPTY){
-		NOR_EraseAddress(&Nor, 0x0, NOR_ERASE_4K);
-	}
-
-	NOR_WriteBytes(&Nor, (uint8_t*)&Value, addr, sizeof(Value));
-}
-
-void __write_nor_reg2(){
-	uint32_t addr = 0x2500;
-	uint32_t page;
-	uint32_t Value = 200;
-
-	page = addr/Nor.info.u16PageSize;
-	if (NOR_IsEmptyPage(&Nor, page, 0, 4) == NOR_REGIONS_IS_NOT_EMPTY){
 		NOR_EraseAddress(&Nor, addr, NOR_ERASE_4K);
 	}
 
-	NOR_WriteBytes(&Nor, (uint8_t*)&Value, addr, sizeof(Value));
+	NOR_WriteBytes(&Nor, (uint8_t*)&val, addr, sizeof(val));
 }
 
 /* USER CODE END 0 */
@@ -156,7 +138,7 @@ void __write_nor_reg2(){
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
+	uint32_t Counter = 0;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -183,14 +165,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   __init_nor();
 
-  __read_nor_reg1();
-  __read_nor_reg2();
-
-  __write_nor_reg1();
-  __write_nor_reg2();
-
-  __read_nor_reg1();
-  __read_nor_reg2();
+  __get_counter_Val(&Counter);
   /* USER CODE END 2 */
 
   /* Infinite loop */
