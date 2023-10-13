@@ -1,0 +1,3 @@
+[submodule "/libs/flash-nor"]
+	path = /libs/flash-nor
+	url = git@github.com:Pablo-Jean/Nor-Flash-Driver.git
