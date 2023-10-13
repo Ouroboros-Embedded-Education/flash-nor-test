@@ -110,21 +110,29 @@ void __nor_init(){
 }
 
 void __get_counter_Val(uint32_t *val){
-	uint32_t addr = 0x0;
+	uint32_t addr = 0x1000;
 	uint32_t _temp;
 
-	NOR_ReadBytes(&Nor, &_temp, addr, sizeof(_temp));
+	NOR_ReadBytes(&Nor, (uint8_t*)&_temp, addr, sizeof(_temp));
 	if (_temp != 0xFFFFFFFF){
 		*val = _temp;
 	}
 }
 
 void __set_couter_Val(uint32_t val){
-	uint32_t addr = 0;
+	uint32_t addr = 0x1000;
+	uint32_t page;
 
-	if (NOR_IsEmptyPage(&Nor, 0, 0, 4) == NOR_REGIONS_IS_NOT_EMPTY){
+	page = addr/Nor.info.u16PageSize;
+
+	// Sempre me consome 1 ciclo da vida util da memoria
+	// baixa durabilidade
+	if (NOR_IsEmptyPage(&Nor, page, 0, 4) == NOR_REGIONS_IS_NOT_EMPTY){
 		NOR_EraseAddress(&Nor, addr, NOR_ERASE_4K);
 	}
+	// Falha no programa
+	// Reboot!
+	// Baixa confiabilidade, risco de perda de dados.
 
 	NOR_WriteBytes(&Nor, (uint8_t*)&val, addr, sizeof(val));
 }
@@ -422,6 +430,8 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 int __io_putchar(int ch){
 	HAL_UART_Transmit(&huart1, (uint8_t*)&ch, 1, 10);
+
+	return 0;
 }
 /* USER CODE END 4 */
 
